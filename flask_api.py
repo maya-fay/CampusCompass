@@ -9,6 +9,7 @@ import sqlite3
 import json
 import sys
 import os
+import requests
 
 # Import the navigator class
 from campus_navigator_gemini import CampusNavigator
@@ -207,6 +208,61 @@ def search_buildings():
             'error': str(e)
         }), 500
 
+@app.route('/api/directions', methods=['POST'])
+def directions():
+    """
+    Returns distance, duration, and step-by-step walking directions
+    between two coordinates. Body:
+      { "origin": {"lat":..., "lng":...}, "destination": {"lat":..., "lng":...}, "mode":"walking" }
+    """
+    try:
+        data = request.get_json(force=True)
+        origin = data.get("origin")
+        dest   = data.get("destination")
+        mode   = data.get("mode", "walking")
+
+        if not origin or not dest:
+            return jsonify({"success": False, "error": "origin and destination are required"}), 400
+
+        key = os.getenv("GOOGLE_MAPS_API_KEY")
+        if not key:
+            return jsonify({"success": False, "error": "Server directions key missing"}), 500
+
+        params = {
+            "origin": f'{origin["lat"]},{origin["lng"]}',
+            "destination": f'{dest["lat"]},{dest["lng"]}',
+            "mode": mode,
+            "key": key,
+        }
+        r = requests.get("https://maps.googleapis.com/maps/api/directions/json", params=params, timeout=10)
+        j = r.json()
+        status = j.get("status", "UNKNOWN_ERROR")
+        if status != "OK":
+            return jsonify({"success": False, "error": status, "details": j}), 400
+
+        route = j["routes"][0]
+        leg   = route["legs"][0]
+
+        result = {
+            "success": True,
+            "distanceText": leg["distance"]["text"],
+            "durationText": leg["duration"]["text"],
+            "startAddress": leg.get("start_address", ""),
+            "endAddress":   leg.get("end_address", ""),
+            "polyline": route["overview_polyline"]["points"],
+            "steps": [
+                {
+                    "html": s["html_instructions"],
+                    "distance": s["distance"]["text"],
+                    "duration": s["duration"]["text"]
+                } for s in leg["steps"]
+            ]
+        }
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -244,6 +300,7 @@ if __name__ == '__main__':
     print("  GET    /api/buildings    - List all buildings")
     print("  GET    /api/building/<id> - Get building details")
     print("  POST   /api/route        - Get route between buildings")
+    print("  POST   /api/directions   - Get directions between coordinates")
     print("  GET    /api/search?q=    - Search buildings")
     print("  GET    /api/health       - Health check")
     print("\nStarting server on http://0.0.0.0:5000")

@@ -5,8 +5,7 @@ import { ChatComposer } from "./components/ChatComposer";
 import { ImageCard } from "./components/ImageCard";
 import { MapPane } from "./components/MapPane";
 import DirectionsCard from "./components/DirectionsCard";
-import { ScrollArea } from "./components/ui/scroll-area";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface Message {
   id: string;
@@ -33,7 +32,7 @@ interface ChatSession {
   messages: Message[];
 }
 
-interface Location {
+interface UserLocation {
   lat: number;
   lng: number;
   name: string;
@@ -41,52 +40,26 @@ interface Location {
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [userLocation, setUserLocation] = useState<Location | null>(null);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [userPinned, setUserPinned] = useState(true);
   const [sessions, setSessions] = useState<ChatSession[]>([
     {
       id: "1",
-      title: "Where is the library?",
-      timestamp: "2 hours ago",
+      title: "New conversation",
+      timestamp: "Just now",
       messages: [
         {
-          id: "welcome-1",
+          id: "1-welcome",
           role: "assistant",
-          content: "👋 Hi! I'm your UWI Campus Navigator. I can help you find your way around campus, locate buildings and facilities, and provide information about various services.\n\nYou can ask me questions like:\n• Where is the library?\n• How do I get to the cafeteria?\n• Where can I find the Student Union?\n• What are the gym facilities like?\n\nHow can I assist you today?",
-          timestamp: "10:29 AM"
-        },
-        {
-          id: "1-1",
-          role: "user",
-          content: "Where is the library?",
-          timestamp: "10:30 AM",
-        },
-        {
-          id: "1-2",
-          role: "assistant",
-          content:
-            "The Main Library is located in the center of campus. It's a large, modern building with extensive study spaces and computer labs.",
-          timestamp: "10:30 AM",
-          poi: {
-            lat: 18.0057,
-            lng: -76.7473,
-            name: "Main Library",
-            description:
-              "Central campus library with study areas",
-          },
+          content: "👋 Hello! I'm your Campus Compass assistant. I can help you find locations, buildings, and services around campus.\n\nTry asking me:\n• \"Where is the library?\"\n• \"How do I get to the cafeteria?\"\n• \"Find the nearest coffee shop\"\n• \"Show me the Student Union\"\n\nWhat would you like to find today?",
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
         },
       ],
-    },
-    {
-      id: "2",
-      title: "How do I get to the cafeteria?",
-      timestamp: "Yesterday",
-      messages: [],
-    },
-    {
-      id: "3",
-      title: "Where is the Student Union?",
-      timestamp: "2 days ago",
-      messages: [],
     },
   ]);
   const [currentSessionId, setCurrentSessionId] = useState<
@@ -106,36 +79,36 @@ export default function App() {
     .find((m) => m.role === "assistant" && m.poi)?.poi;
 
   useEffect(() => {
-    // Auto-scroll to bottom when new messages arrive
-    const scrollContainer = document.querySelector(
-      "[data-radix-scroll-area-viewport]",
-    );
-    if (scrollContainer) {
-      setTimeout(() => {
-        scrollContainer.scrollTop =
-          scrollContainer.scrollHeight;
-      }, 100);
+    // Auto-stick to bottom when new messages arrive (unless user scrolled up)
+    if (userPinned && anchorRef.current) {
+      anchorRef.current.scrollIntoView({ block: "end", behavior: "smooth" });
     }
-  }, [messages]);
+  }, [messages, userPinned]);
+
+  // Detect if user is near bottom (to keep or release pin)
+  const handleScroll = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24; // 24px threshold
+    setUserPinned(atBottom);
+  };
 
   const handleNewChat = () => {
     const newId = `${Date.now()}`;
-    const timeStr = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const welcomeMessage: Message = {
+      id: `${newId}-welcome`,
+      role: "assistant",
+      content: "👋 Hello! I'm your Campus Compass assistant. I can help you find locations, buildings, and services around campus.\n\nTry asking me:\n• \"Where is the library?\"\n• \"How do I get to the cafeteria?\"\n• \"Find the nearest coffee shop\"\n• \"Show me the Student Union\"\n\nWhat would you like to find today?",
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
     const newSession: ChatSession = {
       id: newId,
       title: "New conversation",
       timestamp: "Just now",
-      messages: [
-        {
-          id: `${newId}-welcome`,
-          role: "assistant",
-          content: "👋 Hi! I'm your UWI Campus Navigator. I can help you find your way around campus, locate buildings and facilities, and provide information about various services.\n\nYou can ask me questions like:\n• Where is the library?\n• How do I get to the cafeteria?\n• Where can I find the Student Union?\n• What are the gym facilities like?\n\nHow can I assist you today?",
-          timestamp: timeStr
-        }
-      ],
+      messages: [welcomeMessage],
     };
     setSessions([newSession, ...sessions]);
     setCurrentSessionId(newId);
@@ -375,125 +348,92 @@ export default function App() {
 
         {/* Chat & Map Container */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Chat Area */}
-          <div className="flex-1 flex flex-col min-w-0">
-            {/* Map above messages on mobile */}
+          {/* Chat Area - Mobile: Full height with map on top */}
+          <div className="flex-1 flex flex-col min-w-0 min-h-0">
+            {/* DirectionsCard on mobile - ABOVE chat (fixed, no scroll) */}
             {lastPOI && (
-              <div className="lg:hidden border-b border-border">
+              <div className="lg:hidden border-b border-border flex-shrink-0">
                 <div className="p-4">
                   <DirectionsCard
                     origin={userLocation ? { name: userLocation.name, coords: { lat: userLocation.lat, lng: userLocation.lng } } : null}
                     dest={{ name: lastPOI.name, coords: { lat: lastPOI.lat, lng: lastPOI.lng } }}
                     mode="walking"
                     notes={lastPOI.description ? [lastPOI.description] : []}
-                    onLocationChange={(location) => {
-                      if (location) {
-                        setUserLocation({
-                          lat: location.coords.lat,
-                          lng: location.coords.lng,
-                          name: location.name
-                        });
-                      }
-                    }}
+                    onOriginChange={(location) => setUserLocation(location)}
                   />
-                  <div className="mt-4">
-                    <MapPane
-                      poi={lastPOI}
-                      className="h-[50vh]"
-                    />
-                  </div>
                 </div>
               </div>
             )}
-            {/* Messages */}
-            <ScrollArea className="flex-1 p-4 [&_[data-radix-scroll-area-viewport]]:!scrollbar-thin [&_[data-radix-scroll-area-viewport]]:!scrollbar-track-transparent [&_[data-radix-scroll-area-viewport]]:!scrollbar-thumb-accent hover:[&_[data-radix-scroll-area-viewport]]:!scrollbar-thumb-accent/80">
-              {messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center max-w-md">
-                    <h2 className="text-2xl text-foreground mb-2">
-                      Welcome to UWI Navigator
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Ask me anything about campus locations,
-                      buildings, facilities, and services. I'm
-                      here to help you navigate!
-                    </p>
+
+            {/* Messages - fills remaining space */}
+            <div className="flex-1 min-h-0 relative overflow-hidden">
+              {/* Scrollable messages area - normal scrolling */}
+              <div
+                ref={scrollerRef}
+                onScroll={handleScroll}
+                className="absolute inset-0 overflow-y-auto px-4 pt-0 pb-[100px] flex flex-col gap-4"
+              >
+                {/* Spacer to push messages to bottom when content is shorter than container */}
+                <div className="flex-grow" />
+
+                {/* Render messages in chronological order (oldest to newest) */}
+                {messages.map((message) => (
+                  <div key={message.id}>
+                    <MessageBubble
+                      role={message.role}
+                      content={message.content}
+                      timestamp={message.timestamp}
+                    />
+                    {message.image && (
+                      <div className="mt-3 ml-11">
+                        <ImageCard {...message.image} />
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-4 w-full lg:max-w-4xl lg:mx-auto">
-                  {messages.map((message) => (
-                    <div key={message.id}>
-                      <MessageBubble
-                        role={message.role}
-                        content={message.content}
-                        timestamp={message.timestamp}
-                      />
-                      {message.image && (
-                        <div className="mt-3 ml-11">
-                          <ImageCard {...message.image} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {isTyping && (
+                ))}
+
+                {/* Typing indicator - appears after messages */}
+                {isTyping && (
+                  <div>
                     <MessageBubble
                       role="assistant"
                       content="Typing..."
                       timestamp=""
                     />
-                  )}
-                </div>
-              )}
-            </ScrollArea>
+                  </div>
+                )}
 
-            {/* Map under messages on desktop only */}
-            {/* {lastPOI && (
-              <div className="hidden lg:block border-t border-border">
-                <div className="p-4">
-                  <h3 className="text-sm text-foreground mb-2">
-                    Location
-                  </h3>
-                  
-                  <MapPane
-                    poi={lastPOI}
-                    className="h-[50vh]"
-                  />
-                </div>
-              </div> */}
-            {/* )} */}
+                {/* Anchor at the very bottom to scrollIntoView */}
+                <div ref={anchorRef} />
+              </div>
+            </div>
 
-            {/* Chat Composer */}
-            <ChatComposer
-              onSend={handleSendMessage}
-              disabled={isTyping}
-            />
+            {/* Chat Composer - fixed at bottom of parent container */}
+            <div className="flex-shrink-0">
+              <ChatComposer
+                onSend={handleSendMessage}
+                disabled={isTyping}
+              />
+            </div>
           </div>
 
-          {/* Map Pane and DirectionsCard - Desktop only, docked to right */}
+          {/* DirectionsCard and Map - Desktop only, docked to right */}
           {lastPOI && (
             <div className="hidden lg:flex w-[800px] border-l border-border p-4 gap-4">
               <div className="flex-1 flex flex-col">
                 <div className="flex-1">
-                <DirectionsCard
-                  origin={userLocation ? { name: userLocation.name, coords: { lat: userLocation.lat, lng: userLocation.lng } } : null}
-                  dest={{ name: lastPOI.name, coords: { lat: lastPOI.lat, lng: lastPOI.lng } }}
-                  mode="walking"
-                  notes={lastPOI.description ? [lastPOI.description] : []}
-                  onLocationChange={(location) => {
-                    if (location) {
-                      setUserLocation({
-                        lat: location.coords.lat,
-                        lng: location.coords.lng,
-                        name: location.name
-                      });
-                    }
-                  }}
-                />
-              </div>
+                  <DirectionsCard
+                    origin={userLocation ? { name: userLocation.name, coords: { lat: userLocation.lat, lng: userLocation.lng } } : null}
+                    dest={{ name: lastPOI.name, coords: { lat: lastPOI.lat, lng: lastPOI.lng } }}
+                    mode="walking"
+                    notes={lastPOI.description ? [lastPOI.description] : []}
+                    onOriginChange={(location) => setUserLocation(location)}
+                  />
+                </div>
                 <MapPane
                   poi={lastPOI}
                   className="flex-1 min-h-[60vh]"
+                  userLocation={userLocation}
                 />
               </div>
             </div>

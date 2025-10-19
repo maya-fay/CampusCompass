@@ -42,3 +42,27 @@ export function gmapsEmbedUrlForDest(dest: LatLng | string) {
   if (typeof dest === "string") return `${base}?q=${encodeURIComponent(dest)}&output=embed`;
   return `${base}?q=${dest.lat},${dest.lng}&output=embed`;
 }
+// ---- Interactive route (Embed API) ----
+// Draws an actual route in an <iframe>. Requires VITE_GOOGLE_MAPS_KEY with "Maps Embed API" enabled.
+export function gmapsDirectionsEmbedUrl(
+  origin: LatLng | null,                  // null => we'll fall back to a campus center
+  dest: LatLng | string,                   // coords or a name
+  mode: "walking" | "driving" | "transit" = "walking",
+  fallbackOrigin: LatLng = { lat: 18.0134, lng: -76.7445 } // TODO: set your campus center
+) {
+  const k = import.meta.env?.VITE_GOOGLE_MAPS_KEY;
+  if (!k) throw new Error("[maps.ts] Missing VITE_GOOGLE_MAPS_KEY for Embed API");
+
+  const base = "https://www.google.com/maps/embed/v1/directions";
+  const originParam = origin ? `${origin.lat},${origin.lng}` : `${fallbackOrigin.lat},${fallbackOrigin.lng}`;
+  const destParam = typeof dest === "string" ? dest : `${dest.lat},${dest.lng}`;
+
+  const qp = new URLSearchParams({
+    key: k,
+    origin: originParam,
+    destination: destParam,
+    mode
+  });
+
+  return `${base}?${qp.toString()}`;
+}

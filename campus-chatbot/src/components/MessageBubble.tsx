@@ -27,7 +27,7 @@ export function MessageBubble({
       )}
 
       <div
-        className={`flex flex-col max-w-[80%] ${isUser ? "items-end" : "items-start"}`}
+        className={`flex flex-col max-w-[85%] md:max-w-[70%] ${isUser ? "items-end" : "items-start"}`}
       >
         <div
           className={`rounded-xl px-4 py-3 ${

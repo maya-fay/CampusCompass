@@ -1,7 +1,7 @@
 
 
 import { useState, useEffect } from 'react';
-import { MapPin } from 'lucide-react';
+import { staticMapUrl } from '../lib/maps';
 
 interface POI {
   lat: number;
@@ -19,33 +19,83 @@ interface Location {
 interface MapPaneProps {
   poi?: POI;
   className?: string;
-  onLocationChange?: (location: Location | null) => void;
+  userLocation?: Location | null;
 }
 
-export function MapPane({ poi, className = "", onLocationChange }: MapPaneProps) {
-  const [userLocation, setUserLocation] = useState<Location | null>(null);
+export function MapPane({ poi, className = "", userLocation }: MapPaneProps) {
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [loadStart, setLoadStart] = useState<number | null>(null);
 
-  // Update userLocation when parent sends location updates
-  React.useEffect(() => {
-    // This effect will be triggered when the parent updates the location
-    // We can listen for location changes from the parent component
-  }, [onLocationChange]);
+  // Generate static map URL based on what we have:
+  // - If we have both origin and destination: show route between them
+  // - If we only have destination: show destination with a single marker
+  const mapUrl = poi
+    ? userLocation
+      ? staticMapUrl({ lat: userLocation.lat, lng: userLocation.lng }, { lat: poi.lat, lng: poi.lng }, 800, 600)
+      : staticMapUrl({ lat: poi.lat, lng: poi.lng }, { lat: poi.lat, lng: poi.lng }, 800, 600)
+    : null;
+
+  // Reset loading state when map URL changes
+  useEffect(() => {
+    setImgLoaded(false);
+    setLoadError(false);
+    setLoadStart(Date.now());
+    console.log("[MapPane] Map URL generated:", mapUrl);
+    console.log("[MapPane] API Key present:", !!import.meta.env.VITE_GOOGLE_MAPS_KEY);
+  }, [mapUrl]);
+
+  const handleImageLoad = () => {
+    const loadTime = loadStart ? Date.now() - loadStart : 0;
+    console.log(`[MapPane] Map loaded successfully in ${loadTime}ms`);
+    setImgLoaded(true);
+  };
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const loadTime = loadStart ? Date.now() - loadStart : 0;
+    console.error(`[MapPane] Map failed to load after ${loadTime}ms`, e);
+    console.error("[MapPane] Failed URL:", mapUrl);
+    setLoadError(true);
+  };
 
   return (
     <div className={`relative bg-secondary w-full h-full flex flex-col ${className}`}>
-
       {/* Map container */}
-      <div className="flex-1 relative">
-        {/* Map content will be rendered here */}
-        {userLocation && (
-          <div
-            className="absolute w-6 h-6 transform -translate-x-1/2 -translate-y-1/2"
-            style={{
-              left: `${((userLocation.lng + 76.75) / 0.01) * 100}%`,
-              top: `${((18.01 - userLocation.lat) / 0.01) * 100}%`,
-            }}
-          >
-            <MapPin className="w-full h-full text-blue-500" />
+      <div className="flex-1 relative bg-muted overflow-hidden rounded-lg">
+        {mapUrl ? (
+          <>
+            {!imgLoaded && !loadError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-muted">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                <div className="text-sm text-muted-foreground">Loading map...</div>
+              </div>
+            )}
+            {loadError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-muted text-destructive p-4">
+                <div className="text-lg">⚠️ Map failed to load</div>
+                <div className="text-sm text-center">
+                  Check your Google Maps API key and ensure Static Maps API is enabled
+                </div>
+                <button 
+                  onClick={() => window.open(mapUrl || '', '_blank')}
+                  className="mt-2 px-3 py-1 text-xs border rounded hover:bg-accent"
+                >
+                  Open URL in new tab
+                </button>
+              </div>
+            )}
+            <img
+              src={mapUrl}
+              alt="Campus map with route"
+              className={`w-full h-full object-cover ${imgLoaded ? "block" : "hidden"}`}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+              loading="eager"
+            />
+          </>
+        ) : (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            No location selected
           </div>
         )}
       </div>

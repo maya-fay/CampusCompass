@@ -19,6 +19,7 @@ const ScrollArea = React.forwardRef<
         data-slot="scroll-area-viewport"
         data-radix-scroll-area-viewport="true"
         className="h-full w-full focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
+        style={{ display: 'flex', flexDirection: 'column' }}
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
