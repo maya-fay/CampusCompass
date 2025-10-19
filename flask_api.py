@@ -30,26 +30,27 @@ def process_query():
     try:
         # Get JSON data from request
         data = request.get_json()
-        
+
         if not data or 'query' not in data:
             return jsonify({
                 'success': False,
                 'error': 'Query is required'
             }), 400
-        
+
         query = data['query'].strip()
-        
+
         if not query:
             return jsonify({
                 'success': False,
                 'error': 'Query cannot be empty'
             }), 400
-        
-        # Process query
-        result = navigator.process_query(query)
-        
+
+        # Process query; allow optional debug flag to include raw LLM payload
+        debug_flag = bool(data.get('debug')) if isinstance(data, dict) else False
+        result = navigator.process_query(query, debug=debug_flag)
+
         return jsonify(result), 200
-        
+
     except Exception as e:
         return jsonify({
             'success': False,

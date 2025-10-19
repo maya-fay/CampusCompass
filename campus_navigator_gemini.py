@@ -2,10 +2,12 @@ import sqlite3
 import json
 import sys
 import os
+import uuid
+from datetime import datetime
 from typing import Dict, List, Optional
 
-# Configuration - Set your API key
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBG8812ExIiTex-yo__TIunXbMZnu_SA_I")
+# Configuration - Set your API key (do NOT hard-code this in production)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 class CampusNavigator:
     def __init__(self, db_path='campus_navigator.db'):
@@ -18,7 +20,10 @@ class CampusNavigator:
         try:
             import google.generativeai as genai
             genai.configure(api_key=GEMINI_API_KEY)
-            self.model = genai.GenerativeModel('gemini-pro')
+            # Model identifier used when creating the model instance
+            self.model_name = 'gemini-pro'
+            self.model = genai.GenerativeModel(self.model_name)
+            self.model_version = None
             self.llm_type = "gemini"
             print("Using Google Gemini (FREE)", file=sys.stderr)
         except ImportError:
@@ -30,13 +35,29 @@ class CampusNavigator:
     
     def query_llm(self, prompt: str, system_prompt: str) -> str:
         """Send query to Gemini and get response"""
+        # Structured return: {'text': str, 'raw': obj_or_str, 'ok': bool, 'error': str|None}
         try:
             full_prompt = f"{system_prompt}\n\nUser Query: {prompt}"
             response = self.model.generate_content(full_prompt)
-            return response.text
+            # Store last raw payload for provenance/debugging
+            try:
+                raw_repr = response.to_dict() if hasattr(response, 'to_dict') else str(response)
+            except Exception:
+                raw_repr = str(response)
+
+            self._last_llm = {
+                'text': getattr(response, 'text', str(response)),
+                'raw': raw_repr,
+                'ok': True,
+            }
+
+            return {'text': self._last_llm['text'], 'raw': self._last_llm['raw'], 'ok': True, 'error': None}
         except Exception as e:
-            print(f"LLM Error: {e}", file=sys.stderr)
-            return "I'm having trouble processing that right now. Please try again."
+            err = str(e)
+            print(f"LLM Error: {err}", file=sys.stderr)
+            # Record failure
+            self._last_llm = {'text': None, 'raw': None, 'ok': False, 'error': err}
+            return {'text': "I'm having trouble processing that right now. Please try again.", 'raw': None, 'ok': False, 'error': err}
     
     def extract_location(self, user_query: str) -> Dict:
         """Use LLM to extract location information from user query"""
@@ -53,14 +74,15 @@ Examples:
 """
         
         response = self.query_llm(user_query, system_prompt)
+        text = response.get('text') if isinstance(response, dict) else str(response)
         try:
             # Extract JSON from response
-            start = response.find('{')
-            end = response.rfind('}') + 1
+            start = text.find('{')
+            end = text.rfind('}') + 1
             if start != -1 and end > start:
-                return json.loads(response[start:end])
+                return json.loads(text[start:end])
             return {"location": "", "query_type": "info"}
-        except:
+        except Exception:
             return {"location": "", "query_type": "info"}
     
     def search_building(self, location_name: str) -> Optional[Dict]:
@@ -129,7 +151,8 @@ Examples:
         if not building_data:
             system_prompt = "You are a helpful campus navigation assistant."
             prompt = f"The user asked: '{query_data.get('original_query', '')}'. We couldn't find that location on campus. Apologize politely and ask if they meant something else or if they'd like to see all available locations."
-            return self.query_llm(prompt, system_prompt)
+            resp = self.query_llm(prompt, system_prompt)
+            return resp.get('text') if isinstance(resp, dict) else str(resp)
         
         context = f"""Building Information:
 Name: {building_data['name']}
@@ -164,10 +187,11 @@ Directions: {route_data['route_description']}
             prompt = f"The user asked: '{original_query}'. Give them clear walking directions from {from_building['name']} to {building_data['name']}. Use this info: {context}"
         else:
             prompt = f"The user asked: '{original_query}'. Tell them about {building_data['name']} location and what's there. Use this info: {context}"
-        
-        return self.query_llm(prompt, system_prompt)
+
+        resp = self.query_llm(prompt, system_prompt)
+        return resp.get('text') if isinstance(resp, dict) else str(resp)
     
-    def process_query(self, user_query: str) -> Dict:
+    def process_query(self, user_query: str, debug: bool = False) -> Dict:
         """Main function to process user query"""
         print(f"Processing query: {user_query}", file=sys.stderr)
         
@@ -193,19 +217,37 @@ Directions: {route_data['route_description']}
         pois = []
         if building_data:
             pois = self.get_pois(building_data['id'])
-        
-        # Generate response
+
+        # Generate response (this will update self._last_llm with the final LLM result if any)
         response_text = self.generate_response(query_data, building_data, route_data, from_building)
-        
-        # Prepare result
+
+        # Determine provenance
+        request_id = uuid.uuid4().hex
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        llm_info = getattr(self, '_last_llm', None)
+        if llm_info and llm_info.get('ok'):
+            response_source = 'llm'
+        else:
+            response_source = 'fallback'
+
         result = {
             'success': True,
+            'request_id': request_id,
+            'timestamp': timestamp,
             'response': response_text,
+            'response_source': response_source,
+            'model': getattr(self, 'model_name', None),
+            'model_version': getattr(self, 'model_version', None),
             'building': building_data,
             'route': route_data,
             'pois': pois
         }
-        
+
+        # Include raw llm payload only in debug mode
+        if debug and llm_info and llm_info.get('raw'):
+            result['llm_raw'] = llm_info.get('raw')
+
         return result
 
 def main():

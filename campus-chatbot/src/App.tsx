@@ -23,6 +23,7 @@ interface Message {
     alt: string;
     caption?: string;
   };
+  responseSource?: 'llm' | 'fallback' | 'cache' | null;
 }
 
 interface ChatSession {
@@ -216,6 +217,7 @@ export default function App() {
           minute: "2-digit",
         }),
         poi: poi,
+        responseSource: data && data.response_source ? data.response_source : null,
       };
 
       setSessions((prev) =>
@@ -240,6 +242,7 @@ export default function App() {
           minute: "2-digit",
         }),
         poi: extractPOI(content),
+        responseSource: 'fallback',
       };
 
       setSessions((prev) =>
@@ -375,6 +378,7 @@ export default function App() {
                         role={message.role}
                         content={message.content}
                         timestamp={message.timestamp}
+                        responseSource={message.responseSource ?? null}
                       />
                       {message.image && (
                         <div className="mt-3 ml-11">
