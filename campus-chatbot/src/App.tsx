@@ -49,6 +49,12 @@ export default function App() {
       timestamp: "2 hours ago",
       messages: [
         {
+          id: "welcome-1",
+          role: "assistant",
+          content: "👋 Hi! I'm your UWI Campus Navigator. I can help you find your way around campus, locate buildings and facilities, and provide information about various services.\n\nYou can ask me questions like:\n• Where is the library?\n• How do I get to the cafeteria?\n• Where can I find the Student Union?\n• What are the gym facilities like?\n\nHow can I assist you today?",
+          timestamp: "10:29 AM"
+        },
+        {
           id: "1-1",
           role: "user",
           content: "Where is the library?",
@@ -114,11 +120,22 @@ export default function App() {
 
   const handleNewChat = () => {
     const newId = `${Date.now()}`;
+    const timeStr = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     const newSession: ChatSession = {
       id: newId,
       title: "New conversation",
       timestamp: "Just now",
-      messages: [],
+      messages: [
+        {
+          id: `${newId}-welcome`,
+          role: "assistant",
+          content: "👋 Hi! I'm your UWI Campus Navigator. I can help you find your way around campus, locate buildings and facilities, and provide information about various services.\n\nYou can ask me questions like:\n• Where is the library?\n• How do I get to the cafeteria?\n• Where can I find the Student Union?\n• What are the gym facilities like?\n\nHow can I assist you today?",
+          timestamp: timeStr
+        }
+      ],
     };
     setSessions([newSession, ...sessions]);
     setCurrentSessionId(newId);
@@ -360,37 +377,36 @@ export default function App() {
         <div className="flex-1 flex overflow-hidden">
           {/* Chat Area */}
           <div className="flex-1 flex flex-col min-w-0">
-          {/* Map Pane and DirectionsCard - Desktop only, docked to right */}
-          {lastPOI && (
-            <div className="lg:hidden flex w-full border-t border-border">
-              <div className="w-full lg:max-w-4xl lg:mx-auto p-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <DirectionsCard
-                  origin={null}
-                  dest={{ name: lastPOI.name, coords: { lat: lastPOI.lat, lng: lastPOI.lng } }}
-                  mode="walking"
-                  notes={lastPOI.description ? [lastPOI.description] : []}
-                />
-                <div className="flex flex-col">
-                  <div className="mb-3">
-                    <h3 className="text-base text-foreground">
-                      Location
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {lastPOI.name}
-                    </p>
-                  </div>
-                  <MapPane
-                    poi={lastPOI}
-                    className="h-[50vh] w-full"
+            {/* Map above messages on mobile */}
+            {lastPOI && (
+              <div className="lg:hidden border-b border-border">
+                <div className="p-4">
+                  <DirectionsCard
+                    origin={userLocation ? { name: userLocation.name, coords: { lat: userLocation.lat, lng: userLocation.lng } } : null}
+                    dest={{ name: lastPOI.name, coords: { lat: lastPOI.lat, lng: lastPOI.lng } }}
+                    mode="walking"
+                    notes={lastPOI.description ? [lastPOI.description] : []}
+                    onLocationChange={(location) => {
+                      if (location) {
+                        setUserLocation({
+                          lat: location.coords.lat,
+                          lng: location.coords.lng,
+                          name: location.name
+                        });
+                      }
+                    }}
                   />
+                  <div className="mt-4">
+                    <MapPane
+                      poi={lastPOI}
+                      className="h-[50vh]"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-      )}
+            )}
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4">
+            <ScrollArea className="flex-1 p-4 [&_[data-radix-scroll-area-viewport]]:!scrollbar-thin [&_[data-radix-scroll-area-viewport]]:!scrollbar-track-transparent [&_[data-radix-scroll-area-viewport]]:!scrollbar-thumb-accent hover:[&_[data-radix-scroll-area-viewport]]:!scrollbar-thumb-accent/80">
               {messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center max-w-md">
@@ -460,20 +476,24 @@ export default function App() {
               <div className="flex-1 flex flex-col">
                 <div className="flex-1">
                 <DirectionsCard
-                  origin={null}
+                  origin={userLocation ? { name: userLocation.name, coords: { lat: userLocation.lat, lng: userLocation.lng } } : null}
                   dest={{ name: lastPOI.name, coords: { lat: lastPOI.lat, lng: lastPOI.lng } }}
                   mode="walking"
                   notes={lastPOI.description ? [lastPOI.description] : []}
+                  onLocationChange={(location) => {
+                    if (location) {
+                      setUserLocation({
+                        lat: location.coords.lat,
+                        lng: location.coords.lng,
+                        name: location.name
+                      });
+                    }
+                  }}
                 />
               </div>
                 <MapPane
                   poi={lastPOI}
                   className="flex-1 min-h-[60vh]"
-                  onLocationChange={(location) => {
-                    if (location) {
-                      setUserLocation(location);
-                    }
-                  }}
                 />
               </div>
             </div>

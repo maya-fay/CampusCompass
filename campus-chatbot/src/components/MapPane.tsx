@@ -1,8 +1,7 @@
 
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MapPin } from 'lucide-react';
-import { Input } from './ui/input';
 
 interface POI {
   lat: number;
@@ -23,83 +22,17 @@ interface MapPaneProps {
   onLocationChange?: (location: Location | null) => void;
 }
 
-const CAMPUS_CENTER = { lat: 18.0057, lng: -76.7473, name: "Campus Center" };
-
 export function MapPane({ poi, className = "", onLocationChange }: MapPaneProps) {
   const [userLocation, setUserLocation] = useState<Location | null>(null);
-  const [isLocating, setIsLocating] = useState(false);
-  const [showLocationInput, setShowLocationInput] = useState(false);
-  const [locationInput, setLocationInput] = useState("");
 
-  const handleGetLocation = () => {
-    setIsLocating(true);
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const newLocation = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            name: "My Location"
-          };
-          setUserLocation(newLocation);
-          onLocationChange?.(newLocation);
-          setIsLocating(false);
-          setShowLocationInput(false);
-        },
-        (error) => {
-          console.error("Geolocation error:", error);
-          setShowLocationInput(true);
-          setIsLocating(false);
-        }
-      );
-    } else {
-      setShowLocationInput(true);
-      setIsLocating(false);
-    }
-  };
-
-  const handleLocationInputSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // For now, use campus coordinates with custom name
-    const newLocation = {
-      ...CAMPUS_CENTER,
-      name: locationInput
-    };
-    setUserLocation(newLocation);
-    onLocationChange?.(newLocation);
-    setLocationInput("");
-  };
+  // Update userLocation when parent sends location updates
+  React.useEffect(() => {
+    // This effect will be triggered when the parent updates the location
+    // We can listen for location changes from the parent component
+  }, [onLocationChange]);
 
   return (
     <div className={`relative bg-secondary w-full h-full flex flex-col ${className}`}>
-      <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
-        {!showLocationInput ? (
-          <button 
-            className="px-3 py-2 rounded-lg border hover:bg-accent"
-            onClick={handleGetLocation}
-            disabled={isLocating}
-          >
-            {isLocating ? "Getting location..." : "Use my location"}
-          </button>
-        ) : (
-          <form onSubmit={handleLocationInputSubmit} className="flex gap-2">
-            <Input
-              type="text"
-              placeholder="Enter location name"
-              value={locationInput}
-              onChange={(e) => setLocationInput(e.target.value)}
-              className="px-3 py-2 rounded-lg border bg-background"
-            />
-            <button 
-              type="submit" 
-              className="px-3 py-2 rounded-lg border hover:bg-accent"
-              disabled={!locationInput}
-            >
-              Set start
-            </button>
-          </form>
-        )}
-      </div>
 
       {/* Map container */}
       <div className="flex-1 relative">

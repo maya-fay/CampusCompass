@@ -2,19 +2,54 @@
 import { useState } from "react";
 import type { LatLng } from "../lib/maps";
 import { staticMapUrl, gmapsDeepLink, gmapsDeepLinkByName, gmapsEmbedUrlForDest } from "../lib/maps";
+import { Input } from "./ui/input";
 
 type Props = {
   origin: { name: string; coords?: LatLng } | null;  // coords optional if geolocation denied
   dest:   { name: string; coords: LatLng };
   mode?: "walking" | "driving" | "transit";
   notes?: string[];
-  onLocationUpdate?: (location: { name: string; coords: LatLng }) => void;
+  onLocationChange?: (location: { name: string; coords: LatLng } | null) => void;
 };
 
 console.log("Maps key:", import.meta.env.VITE_GOOGLE_MAPS_KEY);
 
-export default function DirectionsCard({ origin, dest, mode = "walking", notes = [], onLocationUpdate }: Props) {
+export default function DirectionsCard({ origin, dest, mode = "walking", notes = [], onLocationChange }: Props) {
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [locationInput, setLocationInput] = useState("");
+
+  const handleLocationInputSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newLocation = {
+      name: locationInput,
+      coords: { lat: 18.0057, lng: -76.7473 } // Default campus center coords
+    };
+    onLocationChange?.(newLocation);
+    setLocationInput("");
+  };
+
+  const handleGetCurrentLocation = () => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = {
+            name: "My Location",
+            coords: {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            }
+          };
+          onLocationChange?.(newLocation);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          alert('Unable to get your location. Please make sure location services are enabled.');
+        }
+      );
+    } else {
+      alert('Geolocation is not supported by your browser');
+    }
+  };
 
   const haveOriginCoords = Boolean(origin?.coords);
   const staticUrl = haveOriginCoords ? staticMapUrl(origin!.coords!, dest.coords) : null;
@@ -66,53 +101,39 @@ export default function DirectionsCard({ origin, dest, mode = "walking", notes =
       )}
 
       <div className="flex flex-wrap gap-2">
-        <button
-          className="px-3 py-2 rounded-lg border hover:bg-accent"
-          onClick={() => {
-            if ("geolocation" in navigator) {
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  if (origin && origin.coords) {
-                    // Do nothing if we already have coords
-                    return;
-                  }
-                  // You'll need to add onLocationUpdate prop and handler
-                  onLocationUpdate?.({
-                    name: "My Location",
-                    coords: {
-                      lat: position.coords.latitude,
-                      lng: position.coords.longitude
-                    }
-                  });
-                },
-                (error) => {
-                  console.error("Geolocation error:", error);
-                  // Could add error handling UI here
-                }
-              );
-            }
-          }}
-        >
-          Use my location
-        </button>
-        <a href={deepLink} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg border hover:bg-accent">
-          Open in Google Maps
-        </a>
-        <button
-          className="px-3 py-2 rounded-lg border hover:bg-accent"
-          onClick={() => navigator.clipboard.writeText(dest.name)}
-        >
-          Copy Destination
-        </button>
-        <button
-          className="px-3 py-2 rounded-lg border hover:bg-accent"
-          onClick={() => {
-            const utter = new SpeechSynthesisUtterance(`Directions to ${dest.name}. ${notes.join(". ")}`);
-            speechSynthesis.speak(utter);
-          }}
-        >
-          Speak Directions
-        </button>
+        <div className="flex flex-wrap gap-2 w-full">
+          <form onSubmit={handleLocationInputSubmit} className="flex-1">
+            <Input
+              type="text"
+              placeholder="Enter starting location or use current location"
+              value={locationInput}
+              onChange={(e) => setLocationInput(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border bg-background"
+            />
+          </form>
+          <button
+            type="button"
+            onClick={handleGetCurrentLocation}
+            className="px-3 py-2 rounded-lg border hover:bg-accent font-medium whitespace-nowrap"
+          >
+            Use My Location
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2 w-full">
+          <a href={deepLink} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg border hover:bg-accent font-medium">
+            Open in Google Maps
+          </a>
+          <button
+            className="px-3 py-2 rounded-lg border hover:bg-accent"
+            onClick={() => {
+              const utter = new SpeechSynthesisUtterance(`Directions to ${dest.name}. ${notes.join(". ")}`);
+              speechSynthesis.speak(utter);
+            }}
+          >
+            Speak Directions
+          </button>
+        </div>
       </div>
             </div>
           );
