@@ -159,9 +159,78 @@ export default function App() {
     );
 
     // Simulate assistant response
+    // Send the query to the backend API and use its response. If the API
+    // call fails, fall back to the local generateResponse() function.
     setIsTyping(true);
 
-    setTimeout(() => {
+    // API URL can be overridden at build/dev time with VITE_API_URL
+    const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:5000/api";
+
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: content }),
+      });
+
+      const data: any = await res.json();
+
+      let assistantContent = "";
+      let poi = undefined;
+
+      if (data && data.success) {
+        assistantContent = data.response || generateResponse(content);
+
+        // Try to extract a POI from building info if present
+        if (data.building && data.building.latitude && data.building.longitude) {
+          poi = {
+            lat: Number(data.building.latitude),
+            lng: Number(data.building.longitude),
+            name: data.building.name,
+            description: data.building.description,
+          };
+        } else if (data.pois && data.pois.length > 0) {
+          // Prefer first POI if available
+          const p = data.pois[0];
+          if (p.latitude && p.longitude) {
+            poi = {
+              lat: Number(p.latitude),
+              lng: Number(p.longitude),
+              name: p.name,
+              description: p.description,
+            };
+          }
+        }
+      } else {
+        assistantContent = data && data.error
+          ? `Sorry, I couldn't process that: ${data.error}`
+          : generateResponse(content);
+      }
+
+      const assistantMessage: Message = {
+        id: `${Date.now()}-assistant`,
+        role: "assistant",
+        content: assistantContent,
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        poi: poi,
+      };
+
+      setSessions((prev) =>
+        prev.map((session) => {
+          if (session.id === currentSessionId) {
+            return {
+              ...session,
+              messages: [...session.messages, assistantMessage],
+            };
+          }
+          return session;
+        }),
+      );
+    } catch (err) {
+      // Network or other error - fallback to local response generator
       const assistantMessage: Message = {
         id: `${Date.now()}-assistant`,
         role: "assistant",
@@ -184,9 +253,9 @@ export default function App() {
           return session;
         }),
       );
-
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const generateResponse = (query: string): string => {
