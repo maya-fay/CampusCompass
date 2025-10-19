@@ -4,6 +4,7 @@ import { MessageBubble } from "./components/MessageBubble";
 import { ChatComposer } from "./components/ChatComposer";
 import { ImageCard } from "./components/ImageCard";
 import { MapPane } from "./components/MapPane";
+import DirectionsCard from "./components/DirectionsCard";
 import { ScrollArea } from "./components/ui/scroll-area";
 import { useState, useEffect } from "react";
 
@@ -32,8 +33,15 @@ interface ChatSession {
   messages: Message[];
 }
 
+interface Location {
+  lat: number;
+  lng: number;
+  name: string;
+}
+
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userLocation, setUserLocation] = useState<Location | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([
     {
       id: "1",
@@ -352,6 +360,35 @@ export default function App() {
         <div className="flex-1 flex overflow-hidden">
           {/* Chat Area */}
           <div className="flex-1 flex flex-col min-w-0">
+          {/* Map Pane and DirectionsCard - Desktop only, docked to right */}
+          {lastPOI && (
+            <div className="lg:hidden flex w-full border-t border-border">
+              <div className="w-full lg:max-w-4xl lg:mx-auto p-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <DirectionsCard
+                  origin={null}
+                  dest={{ name: lastPOI.name, coords: { lat: lastPOI.lat, lng: lastPOI.lng } }}
+                  mode="walking"
+                  notes={lastPOI.description ? [lastPOI.description] : []}
+                />
+                <div className="flex flex-col">
+                  <div className="mb-3">
+                    <h3 className="text-base text-foreground">
+                      Location
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {lastPOI.name}
+                    </p>
+                  </div>
+                  <MapPane
+                    poi={lastPOI}
+                    className="h-[50vh] w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+      )}
             {/* Messages */}
             <ScrollArea className="flex-1 p-4">
               {messages.length === 0 ? (
@@ -368,7 +405,7 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4 max-w-4xl mx-auto">
+                <div className="space-y-4 w-full lg:max-w-4xl lg:mx-auto">
                   {messages.map((message) => (
                     <div key={message.id}>
                       <MessageBubble
@@ -394,20 +431,21 @@ export default function App() {
               )}
             </ScrollArea>
 
-            {/* Map under messages on mobile, visible when POI exists */}
-            {lastPOI && (
-              <div className="lg:hidden border-t border-border">
+            {/* Map under messages on desktop only */}
+            {/* {lastPOI && (
+              <div className="hidden lg:block border-t border-border">
                 <div className="p-4">
                   <h3 className="text-sm text-foreground mb-2">
                     Location
                   </h3>
+                  
                   <MapPane
                     poi={lastPOI}
-                    className="h-[300px]"
+                    className="h-[50vh]"
                   />
                 </div>
-              </div>
-            )}
+              </div> */}
+            {/* )} */}
 
             {/* Chat Composer */}
             <ChatComposer
@@ -416,21 +454,28 @@ export default function App() {
             />
           </div>
 
-          {/* Map Pane - Desktop only, docked to right */}
+          {/* Map Pane and DirectionsCard - Desktop only, docked to right */}
           {lastPOI && (
-            <div className="hidden lg:flex w-[400px] border-l border-border p-4 flex-col">
-              <div className="mb-3">
-                <h3 className="text-base text-foreground">
-                  Location
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {lastPOI.name}
-                </p>
+            <div className="hidden lg:flex w-[800px] border-l border-border p-4 gap-4">
+              <div className="flex-1 flex flex-col">
+                <div className="flex-1">
+                <DirectionsCard
+                  origin={null}
+                  dest={{ name: lastPOI.name, coords: { lat: lastPOI.lat, lng: lastPOI.lng } }}
+                  mode="walking"
+                  notes={lastPOI.description ? [lastPOI.description] : []}
+                />
               </div>
-              <MapPane
-                poi={lastPOI}
-                className="flex-1 min-h-0"
-              />
+                <MapPane
+                  poi={lastPOI}
+                  className="flex-1 min-h-[60vh]"
+                  onLocationChange={(location) => {
+                    if (location) {
+                      setUserLocation(location);
+                    }
+                  }}
+                />
+              </div>
             </div>
           )}
         </div>
