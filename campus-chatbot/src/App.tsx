@@ -5,7 +5,9 @@ import { ChatComposer } from "./components/ChatComposer";
 import { ImageCard } from "./components/ImageCard";
 import { MapPane } from "./components/MapPane";
 import DirectionsCard from "./components/DirectionsCard";
+import DirectionsResult from "./components/DirectionsResult";
 import { useState, useEffect, useRef } from "react";
+import { getDirections } from "./lib/getDirections";
 
 interface Message {
   id: string;
@@ -22,6 +24,13 @@ interface Message {
     src: string;
     alt: string;
     caption?: string;
+  };
+  // NEW (optional) directions payload
+  directions?: {
+    destName: string;
+    distanceText: string;
+    durationText: string;
+    steps: { text: string; distance: string; duration: string }[];
   };
 }
 
@@ -227,6 +236,43 @@ export default function App() {
           return session;
         }),
       );
+
+      // NEW: If we have a POI and user location, get directions
+      if (lastPOI && userLocation) {
+        const data = await getDirections(
+          userLocation,
+          { lat: lastPOI.lat, lng: lastPOI.lng },
+          "walking"
+        );
+
+        // Add message with directions
+        const directionsMessage: Message = {
+          id: `${Date.now()}-directions`,
+          role: "assistant",
+          content: `Here are the directions to ${lastPOI.name}:`,
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          poi: lastPOI,
+          directions: {
+            destName: lastPOI.name,
+            ...data
+          },
+        };
+
+        setSessions((prev) =>
+          prev.map((session) => {
+            if (session.id === currentSessionId) {
+              return {
+                ...session,
+                messages: [...session.messages, directionsMessage],
+              };
+            }
+            return session;
+          }),
+        );
+      }
     } catch (err) {
       // Network or other error - fallback to local response generator
       const assistantMessage: Message = {
@@ -387,6 +433,17 @@ export default function App() {
                     {message.image && (
                       <div className="mt-3 ml-11">
                         <ImageCard {...message.image} />
+                      </div>
+                    )}
+                    {/* NEW: directions bubble with Speak */}
+                    {message.directions && (
+                      <div className="mt-3 ml-11">
+                        <DirectionsResult
+                          destName={message.directions.destName}
+                          distanceText={message.directions.distanceText}
+                          durationText={message.directions.durationText}
+                          steps={message.directions.steps}
+                        />
                       </div>
                     )}
                   </div>
