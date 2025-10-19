@@ -3,7 +3,11 @@ import json
 
 def setup_database():
     """Create and populate the campus database with sample data"""
+    # DEBUG: Starting campus_db_setup
+    print("DEBUG: Starting campus_db_setup...")
+    
     conn = sqlite3.connect('campus_navigator.db')
+    print("DEBUG: Database connected to campus_navigator.db")
     cursor = conn.cursor()
     
     # Create Buildings table
@@ -51,6 +55,7 @@ def setup_database():
         FOREIGN KEY (to_building_id) REFERENCES buildings(id)
     )
     ''')
+    print("DEBUG: Completed table creation.")
     
     # Insert sample buildings
     buildings_data = [
@@ -89,6 +94,7 @@ def setup_database():
     INSERT INTO buildings (name, aliases, latitude, longitude, address, description, building_hours, image_url, building_code)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', buildings_data)
+    print("DEBUG: Completed data insertion.")
     
     # Insert sample POIs
     poi_data = [
@@ -131,7 +137,10 @@ def setup_database():
     ''', routes_data)
     
     conn.commit()
+    print("DEBUG: Database commit complete.")
+    
     conn.close()
+    print("DEBUG: Database connection closed.")
     print("Database setup complete! Created campus_navigator.db with sample data.")
 
 if __name__ == "__main__":

@@ -27,23 +27,17 @@ CORS(app)  # Enable CORS for mobile app
 # Initialize navigator
 navigator = CampusNavigator()
 
-# DEBUG: Starting Flask API module
-print("DEBUG: Flask API module starting...")
-
 @app.route('/api', methods=['POST', 'OPTIONS'])
 def process_query():
     """Handle chat queries from mobile app"""
-    print("DEBUG: Received request on /api")
     
     # Handle preflight CORS request
     if request.method == 'OPTIONS':
-        print("DEBUG: Handling CORS preflight request")
         return '', 200
     
     try:
         # Get JSON data from request
         data = request.get_json()
-        print(f"DEBUG: Request data: {data}")
 
         if not data or 'query' not in data:
             return jsonify({
@@ -62,12 +56,10 @@ def process_query():
         # Process query; allow optional debug flag to include raw LLM payload
         debug_flag = bool(data.get('debug')) if isinstance(data, dict) else False
         result = navigator.process_query(query, debug=debug_flag)
-        print(f"DEBUG: Processed query result: {result}")
 
         return jsonify(result), 200
 
     except Exception as e:
-        print(f"ERROR: Exception in /api processing: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -76,7 +68,6 @@ def process_query():
 @app.route('/api/buildings', methods=['GET'])
 def get_buildings():
     """Get list of all buildings"""
-    print("DEBUG: Received request on /api/buildings")
     try:
         conn = sqlite3.connect('campus_navigator.db')
         conn.row_factory = sqlite3.Row
@@ -98,7 +89,6 @@ def get_buildings():
         }), 200
         
     except Exception as e:
-        print(f"ERROR: Exception in /api/buildings processing: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -107,7 +97,6 @@ def get_buildings():
 @app.route('/api/building/<int:building_id>', methods=['GET'])
 def get_building(building_id):
     """Get details of a specific building"""
-    print(f"DEBUG: Received request on /api/building/{building_id}")
     try:
         conn = sqlite3.connect('campus_navigator.db')
         conn.row_factory = sqlite3.Row
@@ -136,7 +125,6 @@ def get_building(building_id):
         }), 200
         
     except Exception as e:
-        print(f"ERROR: Exception in /api/building/<id> processing: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -145,10 +133,8 @@ def get_building(building_id):
 @app.route('/api/route', methods=['POST'])
 def get_route():
     """Get route between two buildings"""
-    print("DEBUG: Received request on /api/route")
     try:
         data = request.get_json()
-        print(f"DEBUG: Request data: {data}")
         
         if not data or 'from_id' not in data or 'to_id' not in data:
             return jsonify({
@@ -161,7 +147,6 @@ def get_route():
         
         # Get route
         route = navigator.get_route(from_id, to_id)
-        print(f"DEBUG: Route found: {route}")
         
         if not route:
             return jsonify({
@@ -190,7 +175,6 @@ def get_route():
         }), 200
         
     except Exception as e:
-        print(f"ERROR: Exception in /api/route processing: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -199,10 +183,8 @@ def get_route():
 @app.route('/api/search', methods=['GET'])
 def search_buildings():
     """Search buildings by name or alias"""
-    print("DEBUG: Received request on /api/search")
     try:
         query = request.args.get('q', '').strip()
-        print(f"DEBUG: Search query: {query}")
         
         if not query:
             return jsonify({
@@ -229,7 +211,6 @@ def search_buildings():
         }), 200
         
     except Exception as e:
-        print(f"ERROR: Exception in /api/search processing: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -238,7 +219,6 @@ def search_buildings():
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    print("DEBUG: Received request on /api/health")
     return jsonify({
         'status': 'healthy',
         'service': 'Campus Navigator API',
@@ -278,17 +258,6 @@ def internal_error(error):
         'success': False,
         'error': 'Internal server error'
     }), 500
-
-@app.route('/api/navigate', methods=['POST'])
-def navigate():
-    print("DEBUG: Received request on /api/navigate")
-    data = request.get_json()
-    print(f"DEBUG: Request data: {data}")
-    
-    # Process the navigation request
-    response = navigator.process(data)
-    print(f"DEBUG: Response from navigator: {response}")
-    return jsonify(response)
 
 if __name__ == '__main__':
     # Check if database exists
