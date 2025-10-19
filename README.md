@@ -1,6 +1,7 @@
 # CampusCompass
-AI Hackathon Project - localising events for UWI students and providing directions to buildings
+AI Hackathon Project
 
+Campus Compass is an AI-powered campus navigation assistant designed to help students and visitors find their way with ease around the UWI Mona Campus. The chatbot provides real-time directions to campus locations, along with contextual details like opening hours, available facilities, and optional image previews. Integrated with the Google Maps API, the app also features an interactive map interface that displays estimated travel times and route information, making campus exploration intuitive and efficient.
 ## Groq (LLM) Setup
 
 This project can use Groq as the LLM provider. The project includes a Groq-backed navigator adapter in `campus_navigator_groq.py`.
@@ -32,12 +33,5 @@ python campus_navigator_groq.py "Where is the library?"
 
 # Or test the API endpoint
 Invoke-RestMethod -Uri 'http://localhost:5000/api' -Method Post -ContentType 'application/json' -Body (ConvertTo-Json @{ query = "Where is the library?" })
-```
-
-If you prefer using Google Gemini, the project still contains `campus_navigator_gemini.py` and the Flask API will import the appropriate navigator implementation if found.
-
-````
-
-Note: This repository now uses Groq as the supported LLM provider. The Gemini adapter has been removed; please use `campus_navigator_groq.py` or the generic `campus_navigator.py` if present.
 
 ````
