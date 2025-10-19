@@ -9,7 +9,6 @@ import sqlite3
 import json
 import sys
 import os
-import requests
 
 # Import the navigator class (try Groq first, then generic)
 try:
@@ -28,23 +27,17 @@ CORS(app)  # Enable CORS for mobile app
 # Initialize navigator
 navigator = CampusNavigator()
 
-# DEBUG: Starting Flask API module
-print("DEBUG: Flask API module starting...")
-
 @app.route('/api', methods=['POST', 'OPTIONS'])
 def process_query():
     """Handle chat queries from mobile app"""
-    print("DEBUG: Received request on /api")
     
     # Handle preflight CORS request
     if request.method == 'OPTIONS':
-        print("DEBUG: Handling CORS preflight request")
         return '', 200
     
     try:
         # Get JSON data from request
         data = request.get_json()
-        print(f"DEBUG: Request data: {data}")
 
         if not data or 'query' not in data:
             return jsonify({
@@ -63,12 +56,10 @@ def process_query():
         # Process query; allow optional debug flag to include raw LLM payload
         debug_flag = bool(data.get('debug')) if isinstance(data, dict) else False
         result = navigator.process_query(query, debug=debug_flag)
-        print(f"DEBUG: Processed query result: {result}")
 
         return jsonify(result), 200
 
     except Exception as e:
-        print(f"ERROR: Exception in /api processing: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -77,7 +68,6 @@ def process_query():
 @app.route('/api/buildings', methods=['GET'])
 def get_buildings():
     """Get list of all buildings"""
-    print("DEBUG: Received request on /api/buildings")
     try:
         conn = sqlite3.connect('campus_navigator.db')
         conn.row_factory = sqlite3.Row
@@ -99,7 +89,6 @@ def get_buildings():
         }), 200
         
     except Exception as e:
-        print(f"ERROR: Exception in /api/buildings processing: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -108,7 +97,6 @@ def get_buildings():
 @app.route('/api/building/<int:building_id>', methods=['GET'])
 def get_building(building_id):
     """Get details of a specific building"""
-    print(f"DEBUG: Received request on /api/building/{building_id}")
     try:
         conn = sqlite3.connect('campus_navigator.db')
         conn.row_factory = sqlite3.Row
@@ -137,7 +125,6 @@ def get_building(building_id):
         }), 200
         
     except Exception as e:
-        print(f"ERROR: Exception in /api/building/<id> processing: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -146,10 +133,8 @@ def get_building(building_id):
 @app.route('/api/route', methods=['POST'])
 def get_route():
     """Get route between two buildings"""
-    print("DEBUG: Received request on /api/route")
     try:
         data = request.get_json()
-        print(f"DEBUG: Request data: {data}")
         
         if not data or 'from_id' not in data or 'to_id' not in data:
             return jsonify({
@@ -162,7 +147,6 @@ def get_route():
         
         # Get route
         route = navigator.get_route(from_id, to_id)
-        print(f"DEBUG: Route found: {route}")
         
         if not route:
             return jsonify({
@@ -191,7 +175,6 @@ def get_route():
         }), 200
         
     except Exception as e:
-        print(f"ERROR: Exception in /api/route processing: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -200,10 +183,8 @@ def get_route():
 @app.route('/api/search', methods=['GET'])
 def search_buildings():
     """Search buildings by name or alias"""
-    print("DEBUG: Received request on /api/search")
     try:
         query = request.args.get('q', '').strip()
-        print(f"DEBUG: Search query: {query}")
         
         if not query:
             return jsonify({
@@ -230,71 +211,14 @@ def search_buildings():
         }), 200
         
     except Exception as e:
-        print(f"ERROR: Exception in /api/search processing: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
         }), 500
 
-@app.route('/api/directions', methods=['POST'])
-def directions():
-    """
-    Returns distance, duration, and step-by-step walking directions
-    between two coordinates. Body:
-      { "origin": {"lat":..., "lng":...}, "destination": {"lat":..., "lng":...}, "mode":"walking" }
-    """
-    try:
-        data = request.get_json(force=True)
-        origin = data.get("origin")
-        dest   = data.get("destination")
-        mode   = data.get("mode", "walking")
-
-        if not origin or not dest:
-            return jsonify({"success": False, "error": "origin and destination are required"}), 400
-
-        key = os.getenv("GOOGLE_MAPS_API_KEY")
-        if not key:
-            return jsonify({"success": False, "error": "Server directions key missing"}), 500
-
-        params = {
-            "origin": f'{origin["lat"]},{origin["lng"]}',
-            "destination": f'{dest["lat"]},{dest["lng"]}',
-            "mode": mode,
-            "key": key,
-        }
-        r = requests.get("https://maps.googleapis.com/maps/api/directions/json", params=params, timeout=10)
-        j = r.json()
-        status = j.get("status", "UNKNOWN_ERROR")
-        if status != "OK":
-            return jsonify({"success": False, "error": status, "details": j}), 400
-
-        route = j["routes"][0]
-        leg   = route["legs"][0]
-
-        result = {
-            "success": True,
-            "distanceText": leg["distance"]["text"],
-            "durationText": leg["duration"]["text"],
-            "startAddress": leg.get("start_address", ""),
-            "endAddress":   leg.get("end_address", ""),
-            "polyline": route["overview_polyline"]["points"],
-            "steps": [
-                {
-                    "html": s["html_instructions"],
-                    "distance": s["distance"]["text"],
-                    "duration": s["duration"]["text"]
-                } for s in leg["steps"]
-            ]
-        }
-        return jsonify(result), 200
-
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    print("DEBUG: Received request on /api/health")
     return jsonify({
         'status': 'healthy',
         'service': 'Campus Navigator API',
@@ -335,17 +259,6 @@ def internal_error(error):
         'error': 'Internal server error'
     }), 500
 
-@app.route('/api/navigate', methods=['POST'])
-def navigate():
-    print("DEBUG: Received request on /api/navigate")
-    data = request.get_json()
-    print(f"DEBUG: Request data: {data}")
-    
-    # Process the navigation request
-    response = navigator.process(data)
-    print(f"DEBUG: Response from navigator: {response}")
-    return jsonify(response)
-
 if __name__ == '__main__':
     # Check if database exists
     if not os.path.exists('campus_navigator.db'):
@@ -360,7 +273,6 @@ if __name__ == '__main__':
     print("  GET    /api/buildings    - List all buildings")
     print("  GET    /api/building/<id> - Get building details")
     print("  POST   /api/route        - Get route between buildings")
-    print("  POST   /api/directions   - Get directions between coordinates")
     print("  GET    /api/search?q=    - Search buildings")
     print("  GET    /api/health       - Health check")
     print("\nStarting server on http://0.0.0.0:5000")

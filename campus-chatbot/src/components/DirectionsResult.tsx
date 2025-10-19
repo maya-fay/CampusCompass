@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Navigation, Clock, MapPin } from "lucide-react";
-import type { Step } from "../lib/getDirections";
 
 export default function DirectionsResult({
   destName,

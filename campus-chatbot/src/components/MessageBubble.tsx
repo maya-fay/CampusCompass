@@ -5,12 +5,14 @@ interface MessageBubbleProps {
   role: "user" | "assistant";
   content: string;
   timestamp?: string;
+  responseSource?: 'llm' | 'fallback' | 'cache' | null;
 }
 
 export function MessageBubble({
   role,
   content,
   timestamp,
+  responseSource = null,
 }: MessageBubbleProps) {
   const isUser = role === "user";
 
@@ -40,6 +42,16 @@ export function MessageBubble({
             {content}
           </p>
         </div>
+        {/* Source badge for assistant messages */}
+        {!isUser && responseSource && (
+          <div className="mt-1 px-1">
+            <span className={`text-[10px] font-medium inline-block px-2 py-0.5 rounded-full ${
+              responseSource === 'llm' ? 'bg-green-600 text-white' : 'bg-yellow-500 text-white'
+            }`}>
+              {responseSource === 'llm' ? 'LLM' : responseSource.toUpperCase()}
+            </span>
+          </div>
+        )}
         {timestamp && (
           <span className="text-xs text-muted-foreground mt-1 px-1">
             {timestamp}
